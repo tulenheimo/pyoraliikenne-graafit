@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helsingin niemen rajan laskentapisteet 1997–2024</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 1rem; background: #fff; color: #222; overflow: hidden; }
+  #selite { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; font-size: 11px; color: #555; margin: 0 0 0.75rem; }
+</style>
+</head>
+<body>
+
+<h1 style="text-align:center;font-size:17px;font-weight:500;color:#222;margin:1.5rem 0 0.1rem;">Helsingin niemen rajan laskentapisteet 1997–2024</h1>
+<p style="text-align:center;font-size:12px;color:#555;margin:0 0 0.75rem;">Klikkaa pistettä selitteestä piilottaaksesi/näyttääksesi sen</p>
+
+<div id="selite"></div>
+
+<div style="position:relative;width:100%;height:380px;">
+  <canvas id="pisteetChart" role="img" aria-label="Viivakaavio Helsingin niemen rajan 13 laskentapisteestä 1997–2024.">Laskentapisteet: Lauttasaaren silta, Merikannontie, Mechelininkatu, Välskärinkatu, Runeberginkatu, Töölöntorinkatu, Töölönkatu, Mannerheimintie, Hesperianpuisto, Töölönlahti, Eläintarhanlahti, Pitkäsilta, Hakaniemen silta.</canvas>
+</div>
+
+<p style="text-align:left;font-size:11px;color:#999;margin:0.5rem 0 1.5rem;line-height:1.6;">Lähteet: Helsingin kaupunki, Pyöräliikenteen laskennat Helsingissä (1992–2017); Helsinki Region Infoshare, liikennemittausten tilastorajapinta (2018–2024). Polkupyörälaskennat ovat käsilaskentoja, joita tehdään aina kesäkuun arkipäivänä klo 7–19. Vuorokausikerroin otetaan konepistelaskennoista. Mannerheimintie 2023 arvioitu.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const years = [1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024];
+
+const pisteet = [
+  { label: 'Lauttasaaren silta',  color: '#378ADD', dash: [],    data: [3600,3650,3550,3650,5450,4350,4100,3300,3050,4650,3850,4800,6450,5750,5550,5750,8500,5850,5750,7600,4300,7385,5832,6342,5543,6625,5947,7289] },
+  { label: 'Hesperianpuisto',     color: '#D85A30', dash: [],    data: [1800,1500,1500,1750,2100,1800,1900,2050,2050,2100,3400,2550,2450,2750,2350,2450,6300,3200,4000,5600,2800,5695,7608,4203,4677,4905,6176,6079] },
+  { label: 'Mannerheimintie',     color: '#FCBC19', dash: [],    data: [1500,1900,2500,2350,2250,2300,2400,2400,1750,1950,2700,1900,2600,2200,3600,2950,1750,2700,1550,2800,1600,7846,7244,6470,5749,5228,2500,2500] },
+  { label: 'Pitkäsilta',          color: '#1D9E75', dash: [],    data: [2200,1850,2300,2450,2550,2750,2600,2150,2550,2600,4050,4450,4200,3750,5250,4350,5250,5300,4650,5600,6400,4538,4152,5029,3674,3669,4958,5287] },
+  { label: 'Merikannontie',       color: '#7F77DD', dash: [6,3], data: [1400,1950,3250,2950,3150,3700,2100,2800,2950,3200,4600,2550,4250,3750,5150,3350,5350,3350,3900,2300,1900,4758,3634,3795,3199,3956,2980,1907] },
+  { label: 'Hakaniemen silta',    color: '#D4537E', dash: [6,3], data: [2800,1600,2550,1750,2250,1900,1850,1400,2350,1650,3000,2950,2700,2650,3350,2300,3750,2500,2450,3100,3800,2741,2183,3373,4476,1817,2753,3375] },
+  { label: 'Eläintarhanlahti',    color: '#185FA5', dash: [6,3], data: [3000,2400,2550,2500,2600,2800,2150,2000,2350,2250,2950,3400,1950,2650,3400,2550,3000,3300,2800,2000,1900,2729,1647,1797,2001,1659,1614,1590] },
+  { label: 'Töölönlahti',         color: '#BA7517', dash: [3,3], data: [400,500,400,400,800,1000,850,950,1000,1150,1300,1300,750,1150,1050,850,1400,1700,1500,900,1400,4299,1818,1536,3479,2621,3683,1696] },
+  { label: 'Runeberginkatu',      color: '#639922', dash: [3,3], data: [350,300,400,450,400,350,400,500,500,550,700,650,700,650,700,650,800,650,400,500,400,576,661,647,558,392,353,682] },
+  { label: 'Mechelininkatu',      color: '#E24B4A', dash: [3,3], data: [400,350,400,400,400,400,400,400,450,450,650,650,600,550,600,600,600,450,400,300,300,363,869,1359,1012,914,985,1256] },
+  { label: 'Töölönkatu',          color: '#0F6E56', dash: [9,3], data: [500,500,450,400,250,250,250,300,250,300,500,450,400,450,550,550,700,600,450,600,200,550,480,384,378,406,352,386] },
+  { label: 'Töölöntorinkatu',     color: '#993C1D', dash: [9,3], data: [150,150,150,150,150,150,150,200,250,200,300,300,300,300,350,300,350,400,250,300,200,259,216,317,319,205,249,207] },
+  { label: 'Välskärinkatu',       color: '#888780', dash: [9,3], data: [150,150,200,200,200,150,150,150,200,250,250,200,250,100,200,150,250,100,200,200,300,203,239,138,190,158,150,160] }
+];
+
+const datasets = pisteet.map(p => ({
+  label: p.label, data: p.data,
+  borderColor: p.color, backgroundColor: p.color,
+  borderDash: p.dash, borderWidth: 1.5,
+  pointRadius: 2, pointHoverRadius: 5,
+  pointBackgroundColor: p.color,
+  fill: false, tension: 0.2
+}));
+
+const chart = new Chart(document.getElementById('pisteetChart'), {
+  type: 'line',
+  data: { labels: years, datasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#fff', borderColor: 'rgba(0,0,0,0.12)', borderWidth: 1,
+        titleColor: 'rgba(0,0,0,0.75)', bodyColor: 'rgba(0,0,0,0.6)', padding: 10,
+        itemSort: (a, b) => b.parsed.y - a.parsed.y,
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('fi-FI')}` }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(0,0,0,0.06)' },
+        ticks: { color: 'rgba(0,0,0,0.45)', font: { size: 10 }, maxRotation: 45, autoSkip: false }
+      },
+      y: {
+        min: 0,
+        grid: { color: 'rgba(0,0,0,0.06)' },
+        ticks: { color: 'rgba(0,0,0,0.45)', font: { size: 11 }, callback: v => v === 0 ? '0' : (v/1000).toFixed(0) + ' 000' }
+      }
+    }
+  }
+});
+
+const seliteEl = document.getElementById('selite');
+pisteet.forEach((p, i) => {
+  const span = document.createElement('span');
+  span.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;';
+  span.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block;flex-shrink:0;"></span><span id="lbl${i}">${p.label}</span>`;
+  span.onclick = () => {
+    const meta = chart.getDatasetMeta(i);
+    meta.hidden = !meta.hidden;
+    span.style.opacity = meta.hidden ? '0.35' : '1';
+    chart.update();
+  };
+  seliteEl.appendChild(span);
+});
+</script>
+</body>
+</html>
