@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helsingin kantakaupungin rajan ylittävä pyöräliikenne 1992–2022</title>
+<style>
+  body { font-family: sans-serif; margin: 0; padding: 1rem; background: #fff; color: #222; overflow: hidden; }
+  .selite { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 20px; font-size: 12px; color: #555; margin: 0 0 0.5rem; }
+  .selite span { display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+
+<h1 style="text-align:center;font-size:17px;font-weight:500;color:#222;margin:1.5rem 0 0.1rem;">Helsingin kantakaupungin rajan ylittävä pyöräliikenne 1992–2022</h1>
+<p style="text-align:center;font-size:13px;color:#555;margin:0 0 0.5rem;">Kasvu 1992–2022: +59 %</p>
+
+<div class="selite">
+  <span><span style="width:12px;height:12px;background:#378ADD;display:inline-block;border-radius:2px;"></span>Pyöräilijää/vrk (lasketaan joka kolmas vuosi)</span>
+  <span><span style="width:20px;height:0;border-top:2px dashed #D85A30;display:inline-block;"></span>Suhdeluku (1992 = 100)</span>
+</div>
+
+<div style="position:relative;width:100%;height:340px;">
+  <canvas id="kantaChart" role="img" aria-label="Pylväskaavio Helsingin kantakaupungin rajan pyöräliikenteestä 1992–2022. Huippu 2013: 32 850. Vuosi 2022: 28 683. Kasvu +59 %.">Kantakaupungin raja: 1992: 18 000, huippu 2013: 32 850, 2022: 28 683. Kasvu 1992–2022: +59 %.</canvas>
+</div>
+
+<p style="text-align:left;font-size:11px;color:#999;margin:0.5rem 0 1.5rem;line-height:1.6;">Lähteet: Helsingin kaupunki, Pyöräliikenteen laskennat Helsingissä (1992–2016); Helsinki Region Infoshare, liikennemittausten tilastorajapinta (2019, 2022). Polkupyörälaskennat ovat käsilaskentoja, joita tehdään aina kesäkuun arkipäivänä klo 7–19. Vuorokausikerroin otetaan konepistelaskennoista.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const years = ['1992','1995','1998','2001','2004','2007','2010','2013','2016','2019','2022'];
+const data  = [18000, 27700, 18600, 22850, 25300, 26250, 27550, 32850, 31340, 31564, 28683];
+const base  = 18000;
+const index    = data.map(v => Math.round(v / base * 100));
+const baseline = years.map(() => 100);
+const baselineColor = '#333';
+
+const chart = new Chart(document.getElementById('kantaChart'), {
+  data: {
+    labels: years,
+    datasets: [
+      {
+        type: 'bar', label: 'Pyöräilijää/vrk', data,
+        backgroundColor: '#378ADD', hoverBackgroundColor: '#2570c0',
+        borderWidth: 0, borderRadius: 2, yAxisID: 'y', order: 3
+      },
+      {
+        type: 'line', label: 'Suhdeluku (1992 = 100)', data: index,
+        borderColor: '#D85A30', borderDash: [6,3], borderWidth: 2,
+        pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#D85A30',
+        fill: false, tension: 0.2, yAxisID: 'y2', order: 1, clip: false
+      },
+      {
+        type: 'line', label: 'Lähtötaso 100', data: baseline,
+        borderColor: baselineColor, borderDash: [6,4], borderWidth: 2,
+        pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0,
+        yAxisID: 'y2', order: 0, clip: false
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#fff', borderColor: 'rgba(0,0,0,0.12)', borderWidth: 1,
+        titleColor: 'rgba(0,0,0,0.75)', bodyColor: 'rgba(0,0,0,0.6)', padding: 10,
+        filter: item => item.datasetIndex < 2,
+        callbacks: {
+          label: ctx => ctx.datasetIndex === 0
+            ? ` ${ctx.parsed.y.toLocaleString('fi-FI')} pyöräilijää/vrk`
+            : ` Suhdeluku: ${ctx.parsed.y}`
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: 'rgba(0,0,0,0.45)', font: { size: 11 }, maxRotation: 0 }
+      },
+      y: {
+        min: 0, max: 36000,
+        grid: { color: 'rgba(0,0,0,0.06)' },
+        ticks: { color: 'rgba(0,0,0,0.45)', font: { size: 11 }, callback: v => v === 0 ? '0' : (v/1000).toFixed(0) + ' 000' }
+      },
+      y2: {
+        position: 'right', min: 0, max: 200,
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: 'Suhdeluku (1992 = 100)', color: 'rgba(0,0,0,0.45)', font: { size: 11 } },
+        ticks: { color: 'rgba(0,0,0,0.45)', font: { size: 11 } }
+      }
+    },
+    animation: {
+      onComplete: () => {
+        const ctx = chart.ctx;
+        const meta = chart.getDatasetMeta(2);
+        if (!meta.data.length) return;
+        const chartArea = chart.chartArea;
+        const y = meta.data[0].y;
+        ctx.save();
+        ctx.strokeStyle = baselineColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, y);
+        ctx.lineTo(chartArea.right, y);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
