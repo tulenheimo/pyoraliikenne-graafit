@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automaattiset pyörälaskurit Helsingissä 2018–2025</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; background: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  body { padding: 12px 20px 8px; max-width: 820px; margin: 0 auto; }
+  .chart-title    { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
+  .chart-subtitle { font-size: 11px; color: #555; margin-bottom: 7px; }
+  .btn-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; flex-wrap: wrap; }
+  .btn-label { font-size: 10.5px; color: #888; min-width: 82px; }
+  .year-btn {
+    padding: 3px 9px; font-size: 11px; border-radius: 4px; border: 1px solid #ccc;
+    background: #f5f5f5; color: #444; cursor: pointer; line-height: 1.5;
+  }
+  .year-btn.active-base    { background: #555; border-color: #555; color: #fff; font-weight: 600; }
+  .year-btn.active-compare { background: #1a3c72; border-color: #1a3c72; color: #fff; font-weight: 600; }
+  .year-btn:disabled { opacity: 0.35; cursor: default; }
+  .chart-container { position: relative; height: 355px; }
+  .source { margin-top: 7px; font-size: 10px; color: #aaa; border-top: 1px solid #ececec; padding-top: 5px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="chart-title">Automaattiset pyörälaskurit Helsingissä</div>
+<div class="chart-subtitle" id="subtitle">Prosenttimuutos · vihreä = kasvanut, punainen = laskenut · lajiteltu suurimmasta pienimpään</div>
+
+<div class="btn-row">
+  <span class="btn-label">Vertailuvuosi</span>
+  <div id="baseBtns" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+</div>
+<div class="btn-row">
+  <span class="btn-label">Näytetään vuosi</span>
+  <div id="compareBtns" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+</div>
+
+<div class="chart-container">
+  <canvas id="myChart"></canvas>
+</div>
+
+<div class="source">
+  <strong>Lähde:</strong> Helsinki Region Infoshare, <a href="https://hri.fi/data/dataset/helsingin-pyorailijamaarat" target="_blank">Helsingin pyöräilijämäärät</a>. Epärealistisen pienet arvot (anturivika) on poistettu. Vuosi 2025 saattaa sisältää osavuositietoja. * = valitulle vuodelle ei ole dataa; käytetty viimeisintä saatavilla olevaa vuotta.
+</div>
+
+<script>
+const years = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+
+const counters = [
+  { name: 'Auroransilta',              v: [471083, 439745, 426692, 352943, 352320, 393112, 417286, 409193] },
+  { name: 'Eteläesplanadi',            v: [427919, 268520, 486963, 428209, 391386, 319963, 389956, 471036] },
+  { name: 'Huopalahti (asema)',         v: [436703, 433407, 470733, 389680, 327401, 350133, 367840, 363444] },
+  { name: 'Kaisaniemi/Eläintarhanl.',   v: [449484, 423584, 413126, 329386, 161618, 323124, 365758, 407075] },
+  { name: 'Kaivokatu',                  v: [899140, 901293, 821182, 658781, 666321, 683169, 433286, 313637] },
+  { name: 'Kulosaaren silta',           v: [606786, 636463, 915585, 554114, 410415, 626004, 637441, 716981] },
+  { name: 'Kuusisaarentie',             v: [449600, 371956, 436045, 354940, 330526, 364409, 402693, 394824] },
+  { name: 'Käpylä – Pohjoisbaana',      v: [354444, 293317, 429974, 323432, 392900, 471558, 469136, 572085] },
+  { name: 'Lauttasaaren silta',         v: [1142158,   null, 1105822, 956525, 643563, 588945, 904665,   null] },
+  { name: 'Merikannontie',              v: [741656, 605719, 744784, 588370, 500130, 500283, 345840, 564809] },
+  { name: 'Munkkiniemen silta',         v: [710224, 682175, 819242, 526052, 505416, 334244, 274574, 498461] },
+  { name: 'Hesperian puisto/Ooppera',   v: [1011340, 968314, 931891, 838835, 755669, 904564, 695223, 1010522] },
+  { name: 'Pitkäsilta',                 v: [1030095, 1005335, 927157, 684264, 781858, 791491,   null,   null] },
+  { name: 'Ratapihantie',               v: [535390, 525998, 562562, 509505, 354133, 574881, 631743, 749095] },
+  { name: 'Viikintie',                  v: [187231,    null, 142879, 208570, 178255, 184111,    null,   null] },
+  { name: 'Baana',                      v: [977807, 979518, 998679, 918673, 873571,    null,    null, 989544] },
+];
+
+let chart;
+let baseYear    = 2018;
+let compareYear = 2025;
+
+function buildData(base, compare) {
+  const bi = years.indexOf(base);
+  const ci = years.indexOf(compare);
+  const rows = counters
+    .filter(c => c.v[bi] !== null)
+    .map(c => {
+      let useIdx = ci;
+      if (c.v[ci] === null) {
+        for (let i = ci - 1; i >= 0; i--) {
+          if (i !== bi && c.v[i] !== null) { useIdx = i; break; }
+        }
+        if (c.v[useIdx] === null || useIdx === bi) return null;
+      }
+      const fallback = useIdx !== ci;
+      const baseVal  = c.v[bi];
+      const curVal   = c.v[useIdx];
+      return {
+        name:     c.name,
+        pct:      Math.round((curVal - baseVal) / baseVal * 100),
+        base:     baseVal,
+        cur:      curVal,
+        usedYear: years[useIdx],
+        fallback,
+      };
+    })
+    .filter(Boolean);
+  rows.sort((a, b) => b.pct - a.pct);
+  return rows;
+}
+
+function updateSubtitle() {
+  document.getElementById('subtitle').textContent =
+    `Prosenttimuutos vuodesta ${baseYear} vuoteen ${compareYear} · vihreä = kasvanut, punainen = laskenut · lajiteltu suurimmasta pienimpään`;
+}
+
+function draw() {
+  const rows   = buildData(baseYear, compareYear);
+  const labels = rows.map(r => r.fallback ? r.name + ' *' : r.name);
+  const data   = rows.map(r => r.pct);
+  const bg     = data.map(p => p >= 0 ? 'rgba(34,139,34,0.82)' : 'rgba(196,40,40,0.82)');
+  const bd     = data.map(p => p >= 0 ? 'rgba(20,100,20,1)'    : 'rgba(150,20,20,1)');
+
+  // Update x-axis title
+  const xTitle = `Muutos (%) vuodesta ${baseYear}`;
+
+  if (chart) {
+    chart.data.labels                      = labels;
+    chart.data.datasets[0].data           = data;
+    chart.data.datasets[0].backgroundColor = bg;
+    chart.data.datasets[0].borderColor     = bd;
+    chart.options.scales.x.title.text      = xTitle;
+    chart.update();
+  } else {
+    const ctx = document.getElementById('myChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: bg, borderColor: bd, borderWidth: 1, borderRadius: 3 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#fff',
+            borderColor: 'rgba(0,0,0,0.13)',
+            borderWidth: 1,
+            titleColor: '#111',
+            bodyColor: '#555',
+            padding: 10,
+            callbacks: {
+              title: items => items[0].label.replace(' *', ''),
+              label: item => {
+                const r = rows.find(r => r.name === item.label.replace(' *', ''));
+                const p = item.raw;
+                return [
+                  `Muutos: ${p > 0 ? '+' : ''}${p} %`,
+                  `${baseYear}: ${r.base.toLocaleString('fi-FI')}`,
+                  `${r.usedYear}: ${r.cur.toLocaleString('fi-FI')}${r.fallback ? ' (viimeisin saatavilla)' : ''}`,
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: ctx => ctx.tick.value === 0 ? '#888' : '#ececec' },
+            ticks: { font: { size: 10.5 }, color: '#555', callback: v => v + ' %' },
+            title: { display: true, text: xTitle, font: { size: 10.5 }, color: '#666' }
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, color: '#222' },
+          }
+        }
+      }
+    });
+  }
+  updateSubtitle();
+  refreshButtons();
+}
+
+function refreshButtons() {
+  document.querySelectorAll('.base-btn').forEach(b => {
+    const y = +b.dataset.year;
+    b.className = 'year-btn base-btn' + (y === baseYear ? ' active-base' : '');
+    b.disabled  = (y >= compareYear);
+  });
+  document.querySelectorAll('.compare-btn').forEach(b => {
+    const y = +b.dataset.year;
+    b.className = 'year-btn compare-btn' + (y === compareYear ? ' active-compare' : '');
+    b.disabled  = (y <= baseYear);
+  });
+}
+
+// Build baseline buttons: 2018–2024
+years.slice(0, -1).forEach(y => {
+  const btn = document.createElement('button');
+  btn.className   = 'year-btn base-btn';
+  btn.dataset.year = y;
+  btn.textContent = y;
+  btn.addEventListener('click', () => {
+    baseYear = y;
+    if (compareYear <= baseYear) compareYear = years[years.indexOf(baseYear) + 1];
+    draw();
+  });
+  document.getElementById('baseBtns').appendChild(btn);
+});
+
+// Build compare buttons: 2019–2025
+years.slice(1).forEach(y => {
+  const btn = document.createElement('button');
+  btn.className    = 'year-btn compare-btn';
+  btn.dataset.year = y;
+  btn.textContent  = y;
+  btn.addEventListener('click', () => { compareYear = y; draw(); });
+  document.getElementById('compareBtns').appendChild(btn);
+});
+
+draw();
+</script>
+</body>
+</html>
