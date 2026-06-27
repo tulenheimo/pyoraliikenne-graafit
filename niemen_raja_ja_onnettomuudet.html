@@ -93,6 +93,18 @@ const killed = [
     1,  1,  0
 ];
 
+// Seriously injured (vakavasti loukkaantuneet) – data from 2014, no 2024 data
+const serious = [
+  null, null, null,
+  null, null, null, null, null,
+  null, null, null, null, null, null, null,
+  null, null, null, null, null,
+  null, null,
+     6,    3,    3,    1,    5,
+     5,    8,    2,    1,    0,
+  null
+];
+
 // Index: 2000 = 100 (2000 is index position 8 in the array)
 const BASE = 19400;
 const cyclistsIdx = cyclists.map(v => v === null ? null : Math.round(v / BASE * 1000) / 10);
@@ -163,11 +175,14 @@ new Chart(ctx, {
             }
             const k = killed[item.dataIndex];
             const inj = item.raw - k;
-            return [
+            const s = serious[item.dataIndex];
+            const lines = [
               ` Henkilövahingot yhteensä: ${item.raw}`,
               `   joista kuolleita: ${k}`,
-              `   loukkaantuneita: ${inj}`
+              `   loukkaantuneita: ${inj}`,
             ];
+            if (s !== null) lines.push(`   joista vakavasti loukkaantuneita: ${s}`);
+            return lines;
           }
         }
       }
