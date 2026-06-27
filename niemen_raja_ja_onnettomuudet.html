@@ -30,14 +30,14 @@
 <body>
 
 <div class="chart-title">Niemen rajan ylittävä pyöräliikenne ja pyöräonnettomuudet Helsingissä 1992–2024</div>
-<div class="chart-subtitle">Pylväät: pyöräilijää/vrk käsilaskennan perusteella, kesäkuun arkipäivä klo 7–19 &nbsp;·&nbsp; Viiva: onnettomuuksien henkilövahingot, vuosiarvo</div>
+<div class="chart-subtitle">Pylväät: pyöräliikenteen suhdeluku (2000 = 100), niemen raja, kesäkuun arkipäivä &nbsp;·&nbsp; Viiva: onnettomuuksien henkilövahingot, vuosiarvo</div>
 
 <div class="custom-legend">
   <span class="legend-item">
     <svg width="14" height="14" viewBox="0 0 14 14">
       <rect x="0" y="2" width="14" height="10" rx="2" fill="rgba(55,138,221,0.85)"/>
     </svg>
-    Pyöräilijää/vrk (niemen raja)
+    Pyöräilijämäärä, suhdeluku (2000 = 100)
   </span>
   <span class="legend-item">
     <svg width="34" height="14" viewBox="0 0 34 14">
@@ -82,6 +82,21 @@ const accidents = [
    48,  66,  74
 ];
 
+// Killed (polkupyöräilijät, kuolleet) – for tooltip breakdown
+const killed = [
+    4,  3,  2,
+    1,  0,  1,  4,  2,
+    0,  2,  1,  1,  1,  0,  1,
+    0,  0,  0,  0,  1,
+    0,  0,  2,  2,  0,
+    0,  2,  0,  3,  0,
+    1,  1,  0
+];
+
+// Index: 2000 = 100 (2000 is index position 8 in the array)
+const BASE = 19400;
+const cyclistsIdx = cyclists.map(v => v === null ? null : Math.round(v / BASE * 1000) / 10);
+
 // Highlight 2018 bar (year index 26)
 const barColors = cyclists.map((_, i) =>
   (1992 + i) === 2018 ? 'rgba(12,68,124,0.88)' : 'rgba(55,138,221,0.82)'
@@ -97,8 +112,8 @@ new Chart(ctx, {
     datasets: [
       {
         type: 'bar',
-        label: 'Pyöräilijää/vrk',
-        data: cyclists,
+        label: 'Pyöräilijämäärä (2000 = 100)',
+        data: cyclistsIdx,
         backgroundColor: barColors,
         hoverBackgroundColor: barHover,
         borderWidth: 0,
@@ -139,9 +154,20 @@ new Chart(ctx, {
         callbacks: {
           label: item => {
             if (item.raw === null) return null;
-            if (item.datasetIndex === 0)
-              return ` ${item.raw.toLocaleString('fi-FI')} pyöräilijää/vrk`;
-            return ` ${item.raw} henkilövahinkoa`;
+            if (item.datasetIndex === 0) {
+              const vrk = cyclists[item.dataIndex];
+              return [
+                ` Suhdeluku: ${item.raw} (2000 = 100)`,
+                `   ${vrk.toLocaleString('fi-FI')} pyöräilijää/vrk`
+              ];
+            }
+            const k = killed[item.dataIndex];
+            const inj = item.raw - k;
+            return [
+              ` Henkilövahingot yhteensä: ${item.raw}`,
+              `   joista kuolleita: ${k}`,
+              `   loukkaantuneita: ${inj}`
+            ];
           }
         }
       }
@@ -162,17 +188,16 @@ new Chart(ctx, {
       },
       y: {
         min: 0,
-        max: 50000,
+        max: 230,
         position: 'left',
         grid: { color: 'rgba(0,0,0,0.06)' },
         ticks: {
           font: { size: 10 },
           color: 'rgba(55,138,221,0.85)',
-          callback: v => v === 0 ? '0' : (v / 1000).toFixed(0) + ' 000'
         },
         title: {
           display: true,
-          text: 'pyöräilijää/vrk',
+          text: 'Suhdeluku (2000 = 100)',
           font: { size: 10 },
           color: 'rgba(55,138,221,0.75)'
         }
