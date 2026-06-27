@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mikä on pääasiallinen syy pyöräilyysi?</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; background: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  body { padding: 12px 22px 8px; max-width: 820px; margin: 0 auto; }
+
+  .chart-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
+  .chart-subtitle { font-size: 11px; color: #666; margin-bottom: 10px; }
+
+  .controls {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .controls-label { font-size: 10.5px; color: #777; margin-right: 2px; }
+  .year-btn {
+    padding: 3px 11px; border-radius: 12px; border: 1.5px solid;
+    font-size: 10.5px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+    background: transparent;
+  }
+  .year-btn.active  { opacity: 1; }
+  .year-btn.inactive { opacity: 0.28; background: transparent !important; }
+
+  .chart-container { position: relative; height: 390px; }
+
+  .source {
+    margin-top: 9px; font-size: 10px; color: #aaa;
+    border-top: 1px solid #ececec; padding-top: 6px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="chart-title">Mikä on pääasiallinen syy pyöräilyysi?</div>
+<div class="chart-subtitle">% pyöräilijöistä – spontaani vastaus, ei lueteltu</div>
+
+<div class="controls">
+  <span class="controls-label">Vuosi:</span>
+  <div id="yearFilters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+</div>
+
+<div class="chart-container">
+  <canvas id="myChart"></canvas>
+</div>
+
+<div class="source">
+  <strong>Lähteet:</strong> Helsingin kaupunki. <em>Pyöräilybarometri 2024.</em> Kaupunkiympäristön julkaisuja 2025:3 (2016–2024); Helsinki Region Infoshare, <em>Pyöräilybarometri 2014</em> (2014).
+</div>
+
+<script>
+const labels = [
+  ['Myönteiset vaikutukset fyysiseen', 'kuntoon ja terveyteen'],
+  ['Kätevä tapa liikkua'],
+  ['Ulkoilu ja virkistys'],
+  ['Taloudellinen edullisuus'],
+  ['Ympäristösyyt'],
+  ['Riippumattomuus aikatauluista'],
+  ['Joukkoliikenneyhteydet ovat huonot'],
+  ['Ei ole mahdollisuutta käyttää autoa'],
+  ['Muu']
+];
+
+const years = [2024, 2022, 2020, 2018, 2016, 2014];
+const ns    = { 2024: 1217, 2022: 1105, 2020: 1158, 2018: 1182, 2016: 1136, 2014: 1140 };
+
+// Colors: dark → light blue
+const palette = ['#1a3c72', '#2d62ae', '#5592d8', '#8ab8ec', '#bdd6f5', '#deeafa'];
+
+const rawData = {
+  2024: [33, 32, 11,  4, 3, 3,    2,    1, 12],
+  2022: [34, 42,  7,  6, 4, 3,    2,    1,  3],
+  2020: [33, 39,  9,  4, 4, 4,    1,    1,  6],
+  2018: [33, 42,  9,  3, 4, 4,    1,    1,  3],
+  2016: [35, 40, 10,  3, 2, 5,    1,    1,  3],
+  2014: [36, 37, 13,  4, 4, 3, null, null,  4],
+};
+
+const datasets = years.map((year, i) => ({
+  label: `${year} (n = ${ns[year]})`,
+  data: rawData[year],
+  backgroundColor: palette[i] + 'c8',
+  borderColor: palette[i],
+  borderWidth: 1,
+  borderRadius: 2,
+  barThickness: 6,
+  hidden: false,
+}));
+
+const ctx = document.getElementById('myChart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'bar',
+  data: { labels, datasets },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#fff',
+        borderColor: 'rgba(0,0,0,0.13)',
+        borderWidth: 1,
+        titleColor: '#111',
+        bodyColor: '#444',
+        padding: 10,
+        callbacks: {
+          title: items => {
+            const lbl = items[0].label;
+            return Array.isArray(lbl) ? lbl.join(' ') : lbl;
+          },
+          label: item => item.raw === null ? null : ` ${item.dataset.label}: ${item.raw} %`
+        }
+      }
+    },
+    scales: {
+      x: {
+        min: 0,
+        max: 50,
+        grid: { color: 'rgba(0,0,0,0.06)' },
+        ticks: {
+          font: { size: 10 },
+          color: '#666',
+          callback: v => v + ' %'
+        }
+      },
+      y: {
+        grid: { display: false },
+        ticks: {
+          font: { size: 10.5 },
+          color: '#333',
+          crossAlign: 'far',
+        }
+      }
+    }
+  }
+});
+
+// Build year-filter buttons
+const filtersEl = document.getElementById('yearFilters');
+const activeYears = new Set(years);
+
+years.forEach((year, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'year-btn active';
+  btn.textContent = String(year);
+  btn.style.borderColor = palette[i];
+  btn.style.color = palette[i];
+  btn.style.backgroundColor = palette[i] + '18';
+
+  btn.addEventListener('click', () => {
+    const isActive = activeYears.has(year);
+    if (isActive && activeYears.size === 1) return;
+
+    if (isActive) {
+      activeYears.delete(year);
+      btn.classList.replace('active', 'inactive');
+      btn.style.backgroundColor = 'transparent';
+    } else {
+      activeYears.add(year);
+      btn.classList.replace('inactive', 'active');
+      btn.style.backgroundColor = palette[i] + '18';
+    }
+
+    chart.data.datasets.forEach((ds, idx) => {
+      ds.hidden = !activeYears.has(years[idx]);
+    });
+    chart.update();
+  });
+
+  filtersEl.appendChild(btn);
+});
+</script>
+</body>
+</html>
