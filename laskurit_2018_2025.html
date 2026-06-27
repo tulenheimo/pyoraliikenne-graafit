@@ -43,7 +43,7 @@
 </div>
 
 <div class="source">
-  <strong>Lähde:</strong> Helsinki Region Infoshare, <a href="https://hri.fi/data/dataset/helsingin-pyorailijamaarat" target="_blank">Helsingin pyöräilijämäärät</a>. Epärealistisen pienet arvot (anturivika) on poistettu. Vuosi 2025 saattaa sisältää osavuositietoja. * = valitulle vuodelle ei ole dataa; käytetty viimeisintä saatavilla olevaa vuotta.
+  <strong>Lähde:</strong> Helsinki Region Infoshare, <a href="https://hri.fi/data/dataset/helsingin-pyorailijamaarat" target="_blank">Helsingin pyöräilijämäärät</a>. Korjaamatonta dataa. Lähes nolliksi romahtaneet arvot (selvä anturivika) on poistettu ja korvattu viimeisimmällä saatavilla olevalla vuodella. * = laskuri ei käytössä 7–20 % vuodesta · ** = laskuri ei käytössä ≥20 % vuodesta.
 </div>
 
 <script>
@@ -68,6 +68,29 @@ const counters = [
   { name: 'Baana',                      v: [977807, 979518, 998679, 918673, 873571,    null,    null, 989544] },
 ];
 
+// Anomaly % per counter per year (from "Anomaliat % / vuosi" sheet)
+// Combined bridge sides use the higher of the two values
+const anomaly = {
+  'Eteläesplanadi':           { 2019: 7.4,  2021: 5.4 },
+  'Kaisaniemi/Eläintarhanl.': { 2022: 49.6 },
+  'Kaivokatu':                { 2023: 6.6 },
+  'Kulosaaren silta':         { 2022: 29.1, 2024: 22.5 },
+  'Käpylä – Pohjoisbaana':    { 2021: 14.1, 2024: 32.3 },
+  'Lauttasaaren silta':       { 2022: 31.2, 2023: 42.1, 2025: 100 },
+  'Merikannontie':            { 2024: 15.2 },
+  'Munkkiniemen silta':       { 2021: 4.0,  2022: 11.7, 2023: 14.7, 2024: 23.5 },
+  'Hesperian puisto/Ooppera': { 2020: 5.2,  2024: 21.4 },
+  'Pitkäsilta':               { 2021: 22.7, 2023: 18.4, 2024: 61.8, 2025: 100 },
+  'Viikintie':                { 2019: 84.7, 2020: 42.1, 2024: 22.9, 2025: 100 },
+  'Baana':                    { 2023: 74.5, 2024: 96.2 },
+};
+const ANOMALY_LOW  =  7; // % — mark with single *
+const ANOMALY_HIGH = 20; // % — mark with double **
+
+function getAnomaly(name, year) {
+  return (anomaly[name] && anomaly[name][year]) || 0;
+}
+
 let chart;
 let baseYear    = 2018;
 let compareYear = 2024;
@@ -85,9 +108,13 @@ function buildData(base, compare) {
         }
         if (c.v[useIdx] === null || useIdx === bi) return null;
       }
-      const fallback = useIdx !== ci;
-      const baseVal  = c.v[bi];
-      const curVal   = c.v[useIdx];
+      const fallback    = useIdx !== ci;
+      const baseVal     = c.v[bi];
+      const curVal      = c.v[useIdx];
+      const anomalyBase = getAnomaly(c.name, base);
+      const anomalyCmp  = getAnomaly(c.name, years[useIdx]);
+      const maxAnomaly  = Math.max(anomalyBase, anomalyCmp);
+      const flagged     = maxAnomaly >= ANOMALY_LOW ? (maxAnomaly >= ANOMALY_HIGH ? '**' : '*') : '';
       return {
         name:     c.name,
         pct:      Math.round((curVal - baseVal) / baseVal * 100),
@@ -95,6 +122,9 @@ function buildData(base, compare) {
         cur:      curVal,
         usedYear: years[useIdx],
         fallback,
+        flagged,
+        anomalyBase,
+        anomalyCmp,
       };
     })
     .filter(Boolean);
@@ -109,7 +139,7 @@ function updateSubtitle() {
 
 function draw() {
   const rows   = buildData(baseYear, compareYear);
-  const labels = rows.map(r => r.fallback ? r.name + ' *' : r.name);
+  const labels = rows.map(r => r.flagged ? r.name + ' ' + r.flagged : r.name);
   const data   = rows.map(r => r.pct);
   const bg     = data.map(p => p >= 0 ? 'rgba(34,139,34,0.82)' : 'rgba(196,40,40,0.82)');
   const bd     = data.map(p => p >= 0 ? 'rgba(20,100,20,1)'    : 'rgba(150,20,20,1)');
@@ -146,13 +176,18 @@ function draw() {
             callbacks: {
               title: items => items[0].label.replace(' *', ''),
               label: item => {
-                const r = rows.find(r => r.name === item.label.replace(' *', ''));
+                const r = rows.find(r => r.name === item.label.replace(/ \*+$/, ''));
                 const p = item.raw;
-                return [
+                const lines = [
                   `Muutos: ${p > 0 ? '+' : ''}${p} %`,
                   `${baseYear}: ${r.base.toLocaleString('fi-FI')}`,
                   `${r.usedYear}: ${r.cur.toLocaleString('fi-FI')}${r.fallback ? ' (viimeisin saatavilla)' : ''}`,
                 ];
+                if (r.flagged) {
+                  const pct = Math.max(r.anomalyBase, r.anomalyCmp);
+                  lines.push(`${r.flagged} Laskuri ei käytössä ~${pct.toFixed(0)} % vuodesta`);
+                }
+                return lines;
               }
             }
           }
