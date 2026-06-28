@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koettu turvallisuus pyöräilyssä Helsingissä 2014–2024</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; background: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  body { padding: 12px 22px 8px; max-width: 820px; margin: 0 auto; }
+  .chart-title    { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
+  .chart-subtitle { font-size: 11px; color: #777; margin-bottom: 8px; }
+  .selite {
+    display: flex; flex-wrap: wrap; gap: 14px;
+    font-size: 11px; color: #555; margin-bottom: 8px;
+  }
+  .selite span { display: flex; align-items: center; gap: 5px; }
+  .selite .swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+  .source { margin-top: 9px; font-size: 10px; color: #aaa; border-top: 1px solid #ececec; padding-top: 6px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="chart-title">Koettu turvallisuus pyöräilyssä Helsingissä 2014–2024</div>
+<div class="chart-subtitle">% pyöräilijöistä · Helsingin pyöräilybarometri</div>
+
+<div class="selite">
+  <span><span class="swatch" style="background:#0B3E7A;"></span>Turvalliseksi</span>
+  <span><span class="swatch" style="background:#378ADD;"></span>Melko turvalliseksi</span>
+  <span><span class="swatch" style="background:#E8A87C;"></span>Melko turvattomaksi</span>
+  <span><span class="swatch" style="background:#C0392B;"></span>Turvattomaksi</span>
+</div>
+
+<div style="position:relative;width:100%;height:260px;">
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="source">
+  <strong>Lähde:</strong> Helsingin kaupunki, <em>Pyöräilybarometri</em> 2014–2024. Kaupunkiympäristön julkaisuja (2014–2024). Vastaajat: pyöräilevät helsinkiläiset.
+</div>
+
+<script>
+const years = ['2014','2016','2018','2020','2022','2024'];
+
+// Positive side (right): safe
+const turvallisesti   = [12.2, 14.2, 15.8, 17.4, 19.9, 20.7];
+const melkoTurv       = [58.5, 60.2, 59.6, 61.1, 61.5, 55.7];
+// Negative side (left): unsafe (stored as negatives)
+const melkoTurvaton   = [-25.8, -23.8, -22.3, -19.7, -16.9, -20.6];
+const turvaton        = [-3.1,  -1.6,  -2.3,  -1.8,  -1.5,  -2.6];
+
+const tooltip = {
+  backgroundColor: '#fff',
+  borderColor: 'rgba(0,0,0,0.12)',
+  borderWidth: 1,
+  titleColor: '#111',
+  bodyColor: '#555',
+  padding: 10,
+  callbacks: {
+    label: ctx => {
+      const v = Math.abs(ctx.parsed.x).toFixed(1);
+      return ` ${ctx.dataset.label}: ${v} %`;
+    }
+  }
+};
+
+new Chart(document.getElementById('chart'), {
+  type: 'bar',
+  data: {
+    labels: years,
+    datasets: [
+      {
+        label: 'Turvattomaksi',
+        data: turvaton,
+        backgroundColor: '#C0392B',
+        hoverBackgroundColor: '#922b21',
+        borderWidth: 0, borderRadius: 0, stack: 'stack',
+      },
+      {
+        label: 'Melko turvattomaksi',
+        data: melkoTurvaton,
+        backgroundColor: '#E8A87C',
+        hoverBackgroundColor: '#d4845a',
+        borderWidth: 0, borderRadius: 0, stack: 'stack',
+      },
+      {
+        label: 'Melko turvalliseksi',
+        data: melkoTurv,
+        backgroundColor: '#378ADD',
+        hoverBackgroundColor: '#2570c0',
+        borderWidth: 0, borderRadius: 0, stack: 'stack',
+      },
+      {
+        label: 'Turvalliseksi',
+        data: turvallisesti,
+        backgroundColor: '#0B3E7A',
+        hoverBackgroundColor: '#042C53',
+        borderWidth: 0, borderRadius: 0, stack: 'stack',
+      },
+    ]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip,
+    },
+    scales: {
+      x: {
+        stacked: true,
+        min: -32, max: 85,
+        grid: { color: 'rgba(0,0,0,0.06)' },
+        ticks: {
+          font: { size: 10 },
+          color: 'rgba(0,0,0,0.45)',
+          callback: v => Math.abs(v) + ' %',
+          stepSize: 20,
+        }
+      },
+      y: {
+        stacked: true,
+        grid: { display: false },
+        ticks: { font: { size: 11 }, color: '#222' }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
