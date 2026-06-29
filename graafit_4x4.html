@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Helsingin pyöräilijämäärät laskureittain</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; padding: 16px; }
+  h1 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 14px; text-align: center; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .chart-cell { background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 8px 6px 8px; display: flex; flex-direction: column; }
+  .chart-title { font-size: 11px; font-weight: 700; color: #111; line-height: 1.3; margin-bottom: 1px; }
+  .chart-subtitle { font-size: 9.5px; color: #555; margin-bottom: 2px; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 3px; }
+  .legend-item { display: flex; align-items: center; gap: 3px; font-size: 8px; color: #444; }
+  .legend-line { width: 18px; height: 2px; display: inline-block; }
+  .legend-line.solid { background: #0C447C; }
+  .legend-line.dashed-dark { background: repeating-linear-gradient(90deg,#0C447C 0,#0C447C 4px,transparent 4px,transparent 7px); }
+  .legend-line.dashed-red { background: repeating-linear-gradient(90deg,#C0392B 0,#C0392B 4px,transparent 4px,transparent 7px); }
+  .legend-bar { width: 10px; height: 10px; display: inline-block; background: #378ADD; }
+  .legend-bar-anomaly { width: 10px; height: 10px; display: inline-block; background: #C47080; }
+  .chart-wrap { position: relative; flex: 1; height: 130px; }
+  .chart-notes { font-size: 7.5px; color: #888; margin-top: 3px; line-height: 1.5; }
+  .chart-notes .partial-note { color: #555; }
+  .chart-notes a { color: #888; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>Helsingin pyöräilijämäärät laskureittain</h1>
+<div class="grid" id="grid"></div>
+
+<script>
+const URL_L1 = 'https://www.hel.fi/static/liitteet/kaupunkiymparisto/julkaisut/julkaisut/julkaisu-17-17.pdf';
+const URL_L2 = 'https://hri.fi/data/dataset/helsingin-pyorailijamaarat';
+
+const BAR_COLOR   = '#378ADD';
+const BAR_ANOMALY_COLOR = '#C47080';
+const LINE_DARK   = '#0C447C';
+const LINE_RED    = '#C0392B';
+const LINE_REF    = '#888';
+
+// al: 0=normal, 1=7-20% (dark dashed), 2=≥20% (red dashed)
+const STATIONS = [
+  {
+    name: 'Eteläesplanadi', firstFull: 2006,
+    srcNote: 'Pyöräliikenteen laskennat 2017 (2006–2013); Helsinki Region Infoshare (2014–2025)',
+    data: {2006:{c:380136,p:0,al:0},2007:{c:383978,p:0,al:0},2008:{c:388242,p:0,al:0},2009:{c:417253,p:0,al:0},2010:{c:402022,p:0,al:0},2011:{c:417652,p:0,al:0},2012:{c:412995,p:0,al:0},2013:{c:437198,p:0,al:0},2014:{c:448815,p:0,al:0},2015:{c:472499,p:0,al:0},2016:{c:474217,p:0,al:0},2017:{c:468575,p:0,al:0},2018:{c:427919,p:0,al:0},2019:{c:268520,p:0,al:1},2020:{c:486963,p:0,al:0},2021:{c:428209,p:0,al:0},2022:{c:391386,p:0,al:0},2023:{c:319963,p:0,al:0},2024:{c:389956,p:0,al:0},2025:{c:471036,p:0,al:0}}
+  },
+  {
+    name: 'Kaisaniemi/Eläintarhanlahti', firstFull: 2006,
+    srcNote: 'Pyöräliikenteen laskennat 2017 (2006–2013); Helsinki Region Infoshare (2014–2025)',
+    data: {2006:{c:385459,p:0,al:0},2007:{c:368331,p:0,al:0},2008:{c:356267,p:0,al:0},2009:{c:369104,p:0,al:0},2010:{c:382806,p:0,al:0},2011:{c:417640,p:0,al:0},2012:{c:413873,p:0,al:0},2013:{c:434884,p:0,al:0},2014:{c:448673,p:0,al:0},2015:{c:465802,p:0,al:0},2016:{c:409484,p:0,al:0},2017:{c:393363,p:0,al:0},2018:{c:449484,p:0,al:0},2019:{c:423584,p:0,al:0},2020:{c:413126,p:0,al:0},2021:{c:329386,p:0,al:0},2022:{c:161618,p:0,al:2},2023:{c:323124,p:0,al:0},2024:{c:365758,p:0,al:0},2025:{c:407075,p:0,al:0}}
+  },
+  {
+    name: 'Baana', firstFull: 2013,
+    srcNote: 'Pyöräliikenteen laskennat 2017 (2013); Helsinki Region Infoshare (2014–2025)',
+    data: {2013:{c:665908,p:0,al:0},2014:{c:743111,p:0,al:0},2015:{c:802080,p:0,al:0},2016:{c:840145,p:0,al:0},2017:{c:845967,p:0,al:0},2018:{c:977807,p:0,al:0},2019:{c:979518,p:0,al:0},2020:{c:998679,p:0,al:0},2021:{c:918673,p:0,al:0},2022:{c:873571,p:0,al:0},2023:{c:75727,p:0,al:2},2024:{c:6841,p:0,al:2},2025:{c:989544,p:0,al:0}}
+  },
+  {
+    name: 'Lauttasaaren silta', firstFull: 2013,
+    srcNote: 'Pyöräliikenteen laskennat 2017 (2013–2014); Helsinki Region Infoshare (2015–2024)',
+    data: {2013:{c:872916,p:0,al:0},2014:{c:951360,p:0,al:0},2015:{c:1042113,p:0,al:0},2016:{c:1081563,p:0,al:0},2017:{c:1130156,p:0,al:0},2018:{c:1142158,p:0,al:1},2019:{c:991606,p:0,al:2},2020:{c:1105822,p:0,al:0},2021:{c:956525,p:0,al:0},2022:{c:643563,p:0,al:2},2023:{c:588945,p:0,al:2},2024:{c:904665,p:0,al:1},2025:{c:0,p:0,al:2}}
+  },
+  {
+    name: 'Munkkiniemen silta', firstFull: 2013,
+    srcNote: 'Pyöräliikenteen laskennat 2017 (2013); Helsinki Region Infoshare (2014–2025)',
+    data: {2013:{c:526156,p:0,al:0},2014:{c:653941,p:0,al:0},2015:{c:600432,p:0,al:0},2016:{c:655453,p:0,al:0},2017:{c:615933,p:0,al:0},2018:{c:710224,p:0,al:0},2019:{c:682175,p:0,al:0},2020:{c:819242,p:0,al:0},2021:{c:526052,p:0,al:0},2022:{c:505416,p:0,al:1},2023:{c:334244,p:0,al:1},2024:{c:274574,p:0,al:2},2025:{c:498461,p:0,al:0}}
+  },
+  {
+    name: 'Hesperian puisto/Ooppera', firstFull: 2014,
+    srcNote: 'Helsinki Region Infoshare (2014–2025)',
+    data: {2014:{c:640117,p:0,al:0},2015:{c:655187,p:0,al:1},2016:{c:803153,p:0,al:0},2017:{c:909479,p:0,al:0},2018:{c:1011340,p:0,al:0},2019:{c:968314,p:0,al:0},2020:{c:931891,p:0,al:0},2021:{c:838835,p:0,al:0},2022:{c:755669,p:0,al:0},2023:{c:904564,p:0,al:0},2024:{c:695223,p:0,al:2},2025:{c:1010522,p:0,al:0}}
+  },
+  {
+    name: 'Merikannontie', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2014–2025)',
+    data: {2014:{c:57712,p:1,al:0},2015:{c:551635,p:0,al:0},2016:{c:621925,p:0,al:0},2017:{c:653137,p:0,al:0},2018:{c:741656,p:0,al:0},2019:{c:605719,p:0,al:0},2020:{c:744784,p:0,al:0},2021:{c:588370,p:0,al:0},2022:{c:500130,p:0,al:0},2023:{c:500283,p:0,al:0},2024:{c:345840,p:0,al:1},2025:{c:564809,p:0,al:0}}
+  },
+  {
+    name: 'Pitkäsilta', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2014–2025)',
+    data: {2014:{c:397310,p:1,al:0},2015:{c:1056963,p:0,al:0},2016:{c:971911,p:0,al:0},2017:{c:917052,p:0,al:0},2018:{c:1030095,p:0,al:0},2019:{c:1005335,p:0,al:0},2020:{c:927157,p:0,al:0},2021:{c:684264,p:0,al:2},2022:{c:781858,p:0,al:0},2023:{c:791491,p:0,al:1},2024:{c:415020,p:0,al:2},2025:{c:217023,p:0,al:2}}
+  },
+  {
+    name: 'Kuusisaaren silta', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2015–2025)',
+    data: {2015:{c:311133,p:0,al:0},2016:{c:365492,p:0,al:0},2017:{c:355823,p:0,al:0},2018:{c:449600,p:0,al:0},2019:{c:371956,p:0,al:0},2020:{c:436045,p:0,al:0},2021:{c:354940,p:0,al:0},2022:{c:330526,p:0,al:0},2023:{c:364409,p:0,al:0},2024:{c:402693,p:0,al:0},2025:{c:394824,p:0,al:0}}
+  },
+  {
+    name: 'Huopalahti (asema)', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2015–2025)',
+    data: {2015:{c:353348,p:0,al:0},2016:{c:423360,p:0,al:0},2017:{c:378638,p:0,al:0},2018:{c:436703,p:0,al:0},2019:{c:433407,p:0,al:0},2020:{c:470733,p:0,al:0},2021:{c:389680,p:0,al:0},2022:{c:327401,p:0,al:0},2023:{c:350133,p:0,al:0},2024:{c:367840,p:0,al:0},2025:{c:363444,p:0,al:0}}
+  },
+  {
+    name: 'Ratapihantie', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2015–2025)',
+    data: {2015:{c:579469,p:0,al:0},2016:{c:413376,p:0,al:0},2017:{c:365152,p:0,al:0},2018:{c:535390,p:0,al:0},2019:{c:525998,p:0,al:0},2020:{c:562562,p:0,al:0},2021:{c:509505,p:0,al:0},2022:{c:354133,p:0,al:1},2023:{c:574881,p:0,al:0},2024:{c:631743,p:0,al:0},2025:{c:749095,p:0,al:0}}
+  },
+  {
+    name: 'Kulosaaren silta', firstFull: 2015,
+    srcNote: 'Helsinki Region Infoshare (2015–2025)',
+    data: {2015:{c:609743,p:0,al:0},2016:{c:602517,p:0,al:0},2017:{c:505957,p:0,al:0},2018:{c:606786,p:0,al:0},2019:{c:636463,p:0,al:0},2020:{c:915585,p:0,al:0},2021:{c:554114,p:0,al:0},2022:{c:410415,p:0,al:2},2023:{c:626004,p:0,al:0},2024:{c:637441,p:0,al:2},2025:{c:716981,p:0,al:0}}
+  },
+  {
+    name: 'Käpylä – Pohjoisbaana', firstFull: 2018,
+    srcNote: 'Helsinki Region Infoshare (2017–2025)',
+    data: {2017:{c:73748,p:1,al:0},2018:{c:354444,p:0,al:0},2019:{c:293317,p:0,al:0},2020:{c:429974,p:0,al:0},2021:{c:323432,p:0,al:1},2022:{c:392900,p:0,al:0},2023:{c:471558,p:0,al:1},2024:{c:469136,p:0,al:2},2025:{c:572085,p:0,al:0}}
+  },
+  {
+    name: 'Auroransilta', firstFull: 2018,
+    srcNote: 'Helsinki Region Infoshare (2017–2025)',
+    data: {2017:{c:25085,p:1,al:0},2018:{c:471083,p:0,al:0},2019:{c:439745,p:0,al:0},2020:{c:426692,p:0,al:0},2021:{c:352943,p:0,al:0},2022:{c:352320,p:0,al:0},2023:{c:393112,p:0,al:0},2024:{c:417286,p:0,al:0},2025:{c:409193,p:0,al:0}}
+  },
+  {
+    name: 'Kaivokatu', firstFull: 2018,
+    srcNote: 'Helsinki Region Infoshare (2017–2025)',
+    data: {2017:{c:43724,p:1,al:0},2018:{c:899140,p:0,al:0},2019:{c:901293,p:0,al:0},2020:{c:821182,p:0,al:0},2021:{c:658781,p:0,al:0},2022:{c:666321,p:0,al:0},2023:{c:683169,p:0,al:0},2024:{c:433286,p:0,al:0},2025:{c:313637,p:0,al:0}}
+  },
+  {
+    name: 'Viikintie/Viikin baana', firstFull: 2018,
+    srcNote: 'Helsinki Region Infoshare (2017–2023)',
+    data: {2017:{c:9162,p:1,al:0},2018:{c:187231,p:0,al:1},2019:{c:17551,p:0,al:2},2020:{c:142879,p:0,al:2},2021:{c:208570,p:0,al:0},2022:{c:178255,p:0,al:0},2023:{c:184111,p:0,al:0}}
+  }
+];
+
+function formatPct(val) {
+  return (val >= 0 ? '+' : '') + val.toFixed(1).replace('.', ',') + ' %';
+}
+
+const refLinePlugin = {
+  id: 'refLine',
+  afterDraw(chart) {
+    const yScale = chart.scales.yRight;
+    if (!yScale) return;
+    const y = yScale.getPixelForValue(100);
+    const { left, right } = chart.chartArea;
+    const c = chart.ctx;
+    c.save();
+    c.beginPath();
+    c.strokeStyle = LINE_REF;
+    c.lineWidth = 1.5;
+    c.setLineDash([4, 4]);
+    c.moveTo(left, y);
+    c.lineTo(right, y);
+    c.stroke();
+    c.setLineDash([]);
+    c.restore();
+  }
+};
+
+function buildChart(station, canvasId) {
+  const years = Object.keys(station.data).map(Number).sort((a,b)=>a-b);
+  const base = station.data[station.firstFull].c;
+  const lastYear = years[years.length - 1];
+  const pct = (station.data[lastYear].c - base) / base * 100;
+
+  const counts = years.map(y => station.data[y].c);
+
+  // Index: null for partial years, value for full years
+  const indices = years.map(y => {
+    const d = station.data[y];
+    if (d.p) return null;
+    return Math.round(d.c / base * 100);
+  });
+
+  const barColors = years.map(y => (station.data[y].p || station.data[y].al >= 1) ? BAR_ANOMALY_COLOR : BAR_COLOR);
+
+  // Determine max anomaly level across all years (for legend)
+  const maxAl = Math.max(...years.map(y => station.data[y].al));
+
+  // Last reliable year = last year where al < 2 (for subtitle % calculation)
+  const lastReliableYear = [...years].reverse().find(y => station.data[y].al < 2) || years[years.length - 1];
+
+  const nYears = years.length;
+  const tickStep = nYears > 12 ? 4 : nYears > 8 ? 2 : 1;
+
+  const ctx = document.getElementById(canvasId).getContext('2d');
+
+  new Chart(ctx, {
+    data: {
+      labels: years.map(String),
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Pyöräilijämäärä',
+          data: counts,
+          backgroundColor: barColors,
+          yAxisID: 'yLeft',
+          order: 3,
+          barPercentage: 0.85,
+          categoryPercentage: 0.9
+        },
+        {
+          type: 'line',
+          label: 'Suhdeluku',
+          data: indices,
+          borderColor: LINE_DARK,
+          backgroundColor: LINE_DARK,
+          pointRadius: 2.5,
+          pointHoverRadius: 3,
+          borderWidth: 1.5,
+          yAxisID: 'yRight',
+          order: 1,
+          spanGaps: false,
+          segment: {
+            borderColor: ctx => {
+              const al0 = station.data[years[ctx.p0DataIndex]]?.al ?? 0;
+              const al1 = station.data[years[ctx.p1DataIndex]]?.al ?? 0;
+              return Math.max(al0, al1) >= 2 ? LINE_RED : LINE_DARK;
+            },
+            borderDash: ctx => {
+              const al0 = station.data[years[ctx.p0DataIndex]]?.al ?? 0;
+              const al1 = station.data[years[ctx.p1DataIndex]]?.al ?? 0;
+              return Math.max(al0, al1) >= 1 ? [5, 4] : undefined;
+            }
+          }
+        },
+      ]
+    },
+    plugins: [refLinePlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: item => item.dataset.label !== '__none__',
+          callbacks: {
+            label(ctx) {
+              if (ctx.dataset.type === 'bar') return ' ' + ctx.raw.toLocaleString('fi-FI') + ' pyöräilijää';
+              if (ctx.dataset.label === 'Suhdeluku' && ctx.raw !== null) return ' Suhdeluku: ' + ctx.raw;
+              return null;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: { size: 7.5 }, color: '#555',
+            maxRotation: 45, minRotation: 45,
+            autoSkip: false,
+            callback(val, idx) { return years[idx]; }
+          },
+          grid: { display: false }
+        },
+        yLeft: {
+          type: 'linear', position: 'left',
+          beginAtZero: true,
+          ticks: {
+            font: { size: 8 }, color: '#555', maxTicksLimit: 5,
+            callback(v) {
+              if (v >= 1000000) return (v/1000000).toFixed(1).replace('.',',') + 'M';
+              if (v >= 1000) return Math.round(v/1000) + 'k';
+              return v;
+            }
+          },
+          grid: { color: '#f0f0f0' }
+        },
+        yRight: {
+          type: 'linear', position: 'right',
+          beginAtZero: true,
+          ticks: { font: { size: 8 }, color: LINE_DARK, maxTicksLimit: 5 },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  const reliablePct = (station.data[lastReliableYear].c - base) / base * 100;
+  return { firstYear: years[0], lastYear, lastReliableYear, pct: reliablePct, maxAl };
+}
+
+function buildGrid() {
+  const grid = document.getElementById('grid');
+
+  STATIONS.forEach((st, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'chart-cell';
+    const canvasId = 'c' + i;
+
+    // Title
+    const title = document.createElement('div');
+    title.className = 'chart-title';
+    title.textContent = st.name;
+    cell.appendChild(title);
+
+    // Subtitle placeholder
+    const sub = document.createElement('div');
+    sub.className = 'chart-subtitle';
+    cell.appendChild(sub);
+
+    // Legend placeholder
+    const legendEl = document.createElement('div');
+    legendEl.className = 'chart-legend';
+    cell.appendChild(legendEl);
+
+    // Chart wrap
+    const wrap = document.createElement('div');
+    wrap.className = 'chart-wrap';
+    const canvas = document.createElement('canvas');
+    canvas.id = canvasId;
+    wrap.appendChild(canvas);
+    cell.appendChild(wrap);
+
+    // Notes
+    const notes = document.createElement('div');
+    notes.className = 'chart-notes';
+    const hasBoth = st.srcNote.includes(';');
+    const srcHtml = st.srcNote
+      .replace('Pyöräliikenteen laskennat 2017', `<a href="${URL_L1}" target="_blank">Pyöräliikenteen laskennat 2017</a>`)
+      .replace('Helsinki Region Infoshare', `<a href="${URL_L2}" target="_blank">Helsinki Region Infoshare</a>`);
+    notes.innerHTML = (hasBoth ? 'Lähteet: ' : 'Lähde: ') + srcHtml;
+    const partialYears = Object.keys(st.data).filter(y => st.data[y].p).map(Number).sort();
+    if (partialYears.length > 0) {
+      const pn = document.createElement('span');
+      pn.className = 'partial-note';
+      pn.textContent = ' · Osavuosi: ' + partialYears.join(', ');
+      notes.appendChild(pn);
+    }
+    cell.appendChild(notes);
+    grid.appendChild(cell);
+
+    // Build chart
+    const { firstYear, lastYear, lastReliableYear, pct, maxAl } = buildChart(st, canvasId);
+
+    // Fill subtitle
+    sub.textContent = st.firstFull + '–' + lastReliableYear + ': ' + formatPct(pct);
+
+    // Fill legend
+    const hasPartialOrAnom = Object.values(st.data).some(d => d.p || d.al >= 1);
+    const items = [
+      { cls: 'bar', label: 'Pyöräilijämäärä' },
+      { cls: 'solid', label: 'Suhdeluku (1. vuosi = 100)' },
+    ];
+    if (hasPartialOrAnom) items.push({ cls: 'bar-anomaly', label: 'Osavuosi tai käyttökatko' });
+    const hasAl1 = Object.values(st.data).some(d => d.al === 1);
+    const hasAl2 = Object.values(st.data).some(d => d.al >= 2);
+    if (hasAl1) items.push({ cls: 'dashed-dark', label: 'Laskuri ei käytössä 7–20 % ajasta' });
+    if (hasAl2) items.push({ cls: 'dashed-red', label: 'Laskuri ei käytössä ≥20 % ajasta' });
+
+    items.forEach(item => {
+      const li = document.createElement('div');
+      li.className = 'legend-item';
+      const sym = document.createElement('span');
+      if (item.cls === 'bar') {
+        sym.className = 'legend-bar';
+      } else if (item.cls === 'bar-anomaly') {
+        sym.className = 'legend-bar-anomaly';
+      } else {
+        sym.className = 'legend-line ' + item.cls;
+      }
+      li.appendChild(sym);
+      const lbl = document.createElement('span');
+      lbl.textContent = item.label;
+      li.appendChild(lbl);
+      legendEl.appendChild(li);
+    });
+  });
+}
+
+buildGrid();
+</script>
+</body>
+</html>
